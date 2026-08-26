@@ -33,21 +33,18 @@ class TikTokParser(BaseParser):
             url, headers=self.headers, proxy=self.proxy
         )
 
-        # 下载封面和视频
-        cover = self.downloader.download_img(
-            url=video_info.thumbnail, headers=self.headers, proxy=self.proxy
-        )
+        # Hermes 直接发送原视频；不下载无发送价值的封面。
         video = self.downloader.ytdlp_download_video(
             url,
             cookiefile=self.cookiejar.cookie_file,
             headers=self.headers,
             proxy=self.proxy,
-            format="best",
+            format="best[ext=mp4][vcodec!=none][acodec!=none]/best[protocol^=http][vcodec!=none][acodec!=none]",
         )
 
         return self.result(
             title=video_info.title,
             author=Author(name=video_info.channel),
-            contents=[VideoContent(video, cover, duration=video_info.duration)],
+            contents=[VideoContent(video, duration=video_info.duration)],
             timestamp=video_info.timestamp,
         )

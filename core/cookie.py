@@ -6,9 +6,12 @@ from http import cookiejar
 from http.cookies import SimpleCookie
 from urllib.parse import urlparse
 
-from astrbot.api import logger
+import logging
+import os
 
 from .config import ParserItem, PluginConfig
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -302,6 +305,10 @@ class CookieJar:
             )
 
         cj.save(ignore_discard=True, ignore_expires=True)
+        try:
+            os.chmod(self.cookie_file, 0o600)
+        except OSError:
+            logger.warning("无法收紧 cookie 文件权限：%s", self.cookie_file)
         logger.debug(f"已保存 {len(cj)} 个 Cookie 到 {self.cookie_file}")
 
     def load_from_file(self) -> None:

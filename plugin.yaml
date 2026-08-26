@@ -1,0 +1,54 @@
+name: astrbot-plugin-parser
+version: "1.5.6-hermes.1"
+description: Thin Hermes adapter for the upstream X/Twitter and TikTok parsers
+author: Zhalslar; Hermes adapter by Jethuit
+manifest_version: 2
+api_version: 1
+license: MIT
+homepage: https://github.com/Jethuit/astrbot_plugin_parser
+tags: [gateway, telegram, qqbot, twitter, tiktok, media]
+provides_tools:
+  - parse_social_media
+provides_hooks:
+  - pre_gateway_dispatch
+  - transform_llm_output
+  - on_session_end
+  - on_session_finalize
+python_dependencies:
+  - "aiohttp>=3.10,<4"
+  - "aiofiles>=24.1,<25"
+  - "beautifulsoup4>=4.12,<5"
+  - "msgspec>=0.19,<1"
+  - "gallery-dl>=1.30,<2"
+  - "yt-dlp>=2025.1,<2027"
+optional_env:
+  - name: SOCIAL_PARSER_TWITTER_COOKIES
+    description: Optional Twitter cookies in header or Netscape format
+    password: true
+  - name: SOCIAL_PARSER_TIKTOK_COOKIES
+    description: Optional TikTok cookies in header or Netscape format
+    password: true
+  - name: SOCIAL_PARSER_PROXY
+    description: Optional proxy URL; may contain credentials
+    password: true
+config_schema:
+  max_media_mb:
+    type: int
+    default: 90
+    description: Maximum size of one media file in MiB
+  max_duration_minutes:
+    type: int
+    default: 15
+    description: Maximum video duration in minutes
+  download_timeout_seconds:
+    type: int
+    default: 280
+    description: Per-download timeout in seconds
+  download_retries:
+    type: int
+    default: 2
+    description: Retry count for streamed downloads
+  enabled_platforms:
+    type: list
+    default: [telegram, qqbot]
+    description: Gateway platforms where URL auto-detection is active

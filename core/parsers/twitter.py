@@ -68,7 +68,9 @@ class TwitterParser(BaseParser):
         if html_content is None:
             raise ParseException("解析失败, 数据为空")
 
-        return self.parse_twitter_html(html_content)
+        result = self.parse_twitter_html(html_content)
+        result.url = url
+        return result
 
     def parse_twitter_html(self, html_content: str) -> ParseResult:
         """解析 Twitter HTML 内容
