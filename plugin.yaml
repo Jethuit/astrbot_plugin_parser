@@ -1,5 +1,5 @@
 name: astrbot-plugin-parser
-version: "1.5.6-hermes.1"
+version: "1.5.6-hermes.2"
 description: Thin Hermes adapter for the upstream X/Twitter and TikTok parsers
 author: Zhalslar; Hermes adapter by Jethuit
 manifest_version: 2

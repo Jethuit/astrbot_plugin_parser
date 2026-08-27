@@ -172,29 +172,87 @@ def test_media_transform_and_post_delivery_cleanup(fake_ctx):
     )
     assert transformed.count("MEDIA:") == 2
     assert f"MEDIA:{second}" in transformed
+    assert "session" not in runtime._pending
+    assert runtime._awaiting_delivery["session"] == {first, second}
 
     callbacks = []
 
     class Adapter:
         @staticmethod
-        def register_post_delivery_callback(session_key, callback, **kwargs):
+        def register_post_delivery_callback(
+            session_key, callback, *, generation=None
+        ):
             assert session_key == "telegram:dm:1"
+            assert generation == 7
             callbacks.append(callback)
 
     source = SimpleNamespace(platform="telegram")
     entry = SimpleNamespace(
         session_key="telegram:dm:1", origin=source, platform="telegram"
     )
-    runtime._gateway = SimpleNamespace(adapters={"telegram": Adapter()})
+    adapter = Adapter()
+    active = SimpleNamespace(_hermes_run_generation=7)
+    adapter._active_sessions = {"telegram:dm:1": active}
+    runtime._gateway = SimpleNamespace(adapters={"telegram": adapter})
     runtime._session_store = SimpleNamespace(
         lookup_by_session_id=lambda session_id: entry if session_id == "session" else None
     )
 
     runtime.on_session_end("session")
     assert first.exists() and second.exists()
+    assert "session" not in runtime._awaiting_delivery
     assert len(callbacks) == 1
     callbacks[0]()
     assert not first.exists() and not second.exists()
+
+
+def test_repeated_turns_do_not_append_previous_media(fake_ctx):
+    runtime = HermesSocialParser(fake_ctx)
+    first_dir = runtime.cache_root / "first"
+    second_dir = runtime.cache_root / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first = (first_dir / "first.jpg").resolve()
+    second = (second_dir / "second.jpg").resolve()
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+
+    runtime._pending["session"] = {first}
+    first_response = runtime.transform_llm_output(
+        "done", "session", platform="qqbot"
+    )
+    assert f"MEDIA:{first}" in first_response
+
+    entry = SimpleNamespace(
+        session_key="qqbot:dm:1",
+        origin=SimpleNamespace(platform="qqbot"),
+        platform="qqbot",
+    )
+    runtime._gateway = SimpleNamespace(adapters={"qqbot": object()})
+    runtime._session_store = SimpleNamespace(lookup_by_session_id=lambda _sid: entry)
+    runtime.on_session_end("session")
+    assert first.exists()
+
+    runtime._pending["session"] = {second}
+    second_response = runtime.transform_llm_output(
+        "done", "session", platform="qqbot"
+    )
+    assert f"MEDIA:{second}" in second_response
+    assert f"MEDIA:{first}" not in second_response
+
+
+def test_untransformed_media_is_cleaned_at_turn_end(fake_ctx):
+    runtime = HermesSocialParser(fake_ctx)
+    run_dir = runtime.cache_root / "interrupted"
+    run_dir.mkdir()
+    path = (run_dir / "orphan.jpg").resolve()
+    path.write_bytes(b"orphan")
+    runtime._pending["session"] = {path}
+
+    runtime.on_session_end("session", completed=False, interrupted=True)
+
+    assert "session" not in runtime._pending
+    assert not path.exists()
 
 
 def test_missing_delivery_callback_keeps_file(fake_ctx):
@@ -203,7 +261,7 @@ def test_missing_delivery_callback_keeps_file(fake_ctx):
     run_dir.mkdir()
     path = (run_dir / "a.jpg").resolve()
     path.write_bytes(b"a")
-    runtime._pending["session"] = {path}
+    runtime._awaiting_delivery["session"] = {path}
     entry = SimpleNamespace(
         session_key="qqbot:dm:1",
         origin=SimpleNamespace(platform="qqbot"),

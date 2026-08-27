@@ -61,6 +61,7 @@ class HermesSocialParser:
         self.sender = MessageSender()
         self._parse_semaphore = asyncio.Semaphore(1)
         self._pending: dict[str, set[Path]] = {}
+        self._awaiting_delivery: dict[str, set[Path]] = {}
         self._lock = threading.RLock()
         self._gateway = None
         self._session_store = None
@@ -231,7 +232,9 @@ class HermesSocialParser:
         if self._platform_value(platform) not in self.enabled_platforms:
             return None
         with self._lock:
-            paths = sorted(self._pending.get(session_id, set()), key=str)
+            paths = sorted(self._pending.pop(session_id, set()), key=str)
+            if paths:
+                self._awaiting_delivery.setdefault(session_id, set()).update(paths)
         missing = [f"MEDIA:{path}" for path in paths if f"MEDIA:{path}" not in response_text]
         if not missing:
             return None
@@ -240,7 +243,10 @@ class HermesSocialParser:
     def on_session_end(self, session_id: str = "", **kwargs) -> None:
         del kwargs
         with self._lock:
-            paths = set(self._pending.get(session_id, set()))
+            paths = set(self._awaiting_delivery.pop(session_id, set()))
+            orphaned = set(self._pending.pop(session_id, set()))
+        if orphaned:
+            self._cleanup_paths(orphaned)
         if not paths:
             return
         store = self._session_store
@@ -259,15 +265,14 @@ class HermesSocialParser:
 
         def cleanup() -> None:
             self._cleanup_paths(paths)
-            with self._lock:
-                current = self._pending.get(session_id)
-                if current is not None:
-                    current.difference_update(paths)
-                    if not current:
-                        self._pending.pop(session_id, None)
 
         try:
-            callback(entry.session_key, cleanup)
+            active = getattr(adapter, "_active_sessions", {}).get(entry.session_key)
+            generation = getattr(active, "_hermes_run_generation", None)
+            if generation is None:
+                logger.warning("无法确定 Hermes 发送 generation，临时媒体将由 TTL 清理")
+                return
+            callback(entry.session_key, cleanup, generation=generation)
         except Exception:
             logger.warning("无法登记发送后清理回调", exc_info=True)
 
