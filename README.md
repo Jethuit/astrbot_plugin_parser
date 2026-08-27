@@ -44,6 +44,13 @@ Hermes 原生 MEDIA:<绝对路径> 投递
 
 ## 安装
 
+> [!IMPORTANT]
+> Hermes 主分支提交 `df7d7f6` 的插件运行时已经支持
+> `manifest_version: 2`，但 `hermes plugins install` 的安装校验仍只接受 v1
+> manifest，因此会拒绝安装本插件。这是安装器与运行时之间的兼容性遗漏，
+> 并不表示本插件无法运行。修复进入 Hermes 安装器前，请使用下面的手动克隆
+> 方式部署；无需将 `plugin.yaml` 降级为 v1。
+
 当前 fork 的 `main` 仍保持上游内容，Hermes 改造尚未合并到 `main`。请在
 运行 Hermes 的服务器上直接克隆开发分支，不要省略 `--branch`：
 
